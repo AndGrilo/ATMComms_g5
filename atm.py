@@ -18,7 +18,7 @@ def run_atm(args):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
         #TO DO
-        data="account: john"
+        data='{"account": "john"}'
         s.sendall(data.encode())
         data = s.recv(1024)
 
@@ -54,8 +54,8 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    if is_admin():
-        proper_exit('Error: the script must run as unprivileged/regular user')
+    #if is_admin():
+        #proper_exit('Error: the script must run as unprivileged/regular user')
 
     parser = create_parser()
 

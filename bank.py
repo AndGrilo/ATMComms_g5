@@ -4,6 +4,7 @@ import sys
 from utils import *
 import socket
 import argparse
+import json
 from tempfile import mkstemp
 import shutil
 
@@ -51,7 +52,8 @@ def run_server(args):
             if data.decode('utf-8') == 'exit\n':
                 conn.close()
                 break
-            print(data.decode('utf-8'))
+            json_resp = json.loads(data.decode('utf-8')) # convert str to json
+            print(json.dumps(json_resp, sort_keys=True, indent=4))
 
 
 def create_auth_file(filename: str):
@@ -65,8 +67,8 @@ def create_auth_file(filename: str):
 
 
 def main() -> None:
-    if is_admin():
-        proper_exit('Error: the script must run as unprivileged/regular user')
+    #if is_admin():
+        #proper_exit('Error: the script must run as unprivileged/regular user')
 
     parser = create_parser()
 
