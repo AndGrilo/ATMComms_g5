@@ -7,34 +7,43 @@ import argparse
 from tempfile import mkstemp
 import shutil
 
+
 # bank server
 
 
 def validate_args(args) -> Response:
-  #  if len(args.filename) > 1 | len(args.port) > 1:
-   #     return Response(False, 'Arguments cannot be duplicate')
+    #  if len(args.filename) > 1 | len(args.port) > 1:
+    #     return Response(False, 'Arguments cannot be duplicate')
     print(args)
     return Response(True, args)
 
 
 def create_parser() -> argparse.ArgumentParser:
     description = 'Bank Server'
-    usage = '-p <port> -s <auth-file>'
+    usage = '[-p <port>] [-s <auth-file>]'
     parser = argparse.ArgumentParser(usage=usage, description=description, exit_on_error=False)
 
     parser.add_argument('-p', type=int, metavar='<Port>', dest='port', help='The port to listen on', default=3000)
-    parser.add_argument('-s', type=str, metavar='<auth-file>', dest='filename', help='Name of the auth-file')
+    parser.add_argument('-s', type=str, metavar='<auth-file>', dest='filename', help='Name of the auth-file',
+                        default='bank.auth')
 
     return parser
 
 
 def run_server(args):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("Socket successfully created")
+    except socket.error as err:
+        print("socket creation failed with error %s" % err)
+
     port = args.port
+
     s.bind(('', port))
     s.listen()
     print("listening on port ", port)
-    conn, addr= s.accept()
+
+    conn, addr = s.accept()
     with conn:
         print("Connection received from: ", addr)
         while True:
@@ -60,10 +69,6 @@ def main() -> None:
         proper_exit('Error: the script must run as unprivileged/regular user')
 
     parser = create_parser()
-
-    if len(sys.argv) == 1:
-        parser.print_help()
-        proper_exit('', 0)
 
     try:
         args = parser.parse_args()
