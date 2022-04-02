@@ -48,22 +48,31 @@ def run_server(args):
     with conn:
         print("Connection received from: ", addr)
         while True:
+            #print("olá")
             data = conn.recv(1024)
             if data.decode('utf-8') == 'exit\n':
                 conn.close()
                 break
+            if len(data.decode('utf-8')) <= 0 :
+                continue
+
             json_resp = json.loads(data.decode('utf-8')) # convert str to json
             if json_resp["create"]:
                 success = new_account(json_resp)
                 conn.send(bytes(success,encoding='utf-8'))
                 print(success)
+                continue
                 #print(json.dumps(json_resp, sort_keys=True, indent=4))
+            #if json_resp["deposit"]:
+
 
 def new_account(data):
     if int(data["create"]["initial_balance"]) < 10:
         proper_exit()
     resp =  {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"]}
     return json.dumps(resp)
+#def deposit(data):
+
 def create_auth_file(filename: str):
     try:
         f = open(filename, "x")

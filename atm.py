@@ -31,12 +31,12 @@ def run_atm(args):
         if args.withdraw_amount:
             m = {
                 "withdraw":{"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address, "port": args.port,
-                          "card_file": args.card_file, "withdraw_amount": args.withdraw_amount}
+                          "card_file": args.card_file, "withdraw_amountS": args.withdraw_amount}
             }
         if args.balance:
             m = {
                 "create":{"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address, "port": args.port,
-                          "card_file": args.card_file, "balance": args.balance}
+                          "card_file": args.card_file, "initial_balance": args.balance}
             }
 
 
@@ -50,6 +50,7 @@ def run_atm(args):
         data = json.dumps(m)
 
         s.sendall(bytes(data,encoding="utf-8"))
+
         data = s.recv(1024)
 
         print(f"Received {data!r}")
