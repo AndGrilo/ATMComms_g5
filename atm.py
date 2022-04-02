@@ -4,10 +4,25 @@ import sys
 from utils import *
 import socket
 import argparse
+import json
 from tempfile import mkstemp
 import shutil
 
 # client atm
+
+
+def run_atm(args):
+    host = args.ip_address
+    port = args.port
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((host, port))
+        #TO DO
+        data="account: john"
+        s.sendall(data.encode())
+        data = s.recv(1024)
+
+        print(f"Received {data!r}")
 
 
 def validate_args(args) -> Response:
@@ -19,24 +34,23 @@ def validate_args(args) -> Response:
 
 def create_parser() -> argparse.ArgumentParser:
     description = 'ATM Client'
-    usage = '-a <account> ...'
+    usage = '-a <account> [-s <auth-file>] [-i <ip-address>] [-p <port>] [-c <card-file>] (-n <balance> | -d <amount> | -w <amount> | -g)'
     parser = argparse.ArgumentParser(usage=usage, description=description, exit_on_error=False)
+    commands = parser.add_argument_group('available commands')
 
+    commands.add_argument('-a', metavar='account', type=str, dest='account', help='')
+    commands.add_argument('-s', metavar='auth_file', type=str, dest='auth_file', help='')
+    commands.add_argument('-i', metavar='ip_address', type=str, dest='ip_address', help='', default='127.0.0.1')
+    commands.add_argument('-p', metavar='port', type=int, dest='port', help='', default=3000)
+    commands.add_argument('-c', metavar='card_file', type=path_type, dest='card_file', help='')
 
+    mode = commands.add_mutually_exclusive_group()
+    mode.add_argument('-n', metavar='balance', type=int, dest='balance', help='')
+    mode.add_argument('-d', metavar='deposit_amount', type=int, dest='deposit_amount', help='')
+    mode.add_argument('-w', metavar='withdraw_amount', type=int, dest='withdraw_amount', help='')
+    mode.add_argument('-g', action='store_const', const='get', dest='get', help='get balance')
 
     return parser
-
-
-def run_atm(args):
-    host = args.ipaddress
-    port = args.port
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
-        s.sendall(b"Hello, world")
-        data = s.recv(1024)
-
-        print(f"Received {data!r}")
 
 
 def main() -> None:
@@ -45,7 +59,7 @@ def main() -> None:
 
     parser = create_parser()
 
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 0:
         parser.print_help()
         proper_exit('', 0)
 

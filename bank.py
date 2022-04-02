@@ -23,8 +23,8 @@ def create_parser() -> argparse.ArgumentParser:
     usage = '[-p <port>] [-s <auth-file>]'
     parser = argparse.ArgumentParser(usage=usage, description=description, exit_on_error=False)
 
-    parser.add_argument('-p', type=int, metavar='<Port>', dest='port', help='The port to listen on', default=3000)
-    parser.add_argument('-s', type=str, metavar='<auth-file>', dest='filename', help='Name of the auth-file',
+    parser.add_argument('-p', type=int, metavar='<port>', dest='port', help='The port to listen on', default=3000)
+    parser.add_argument('-s', type=str, metavar='<auth_file>', dest='filename', help='Name of the auth-file',
                         default='bank.auth')
 
     return parser
