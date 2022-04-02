@@ -53,9 +53,17 @@ def run_server(args):
                 conn.close()
                 break
             json_resp = json.loads(data.decode('utf-8')) # convert str to json
-            print(json.dumps(json_resp, sort_keys=True, indent=4))
+            if json_resp["create"]:
+                success = new_account(json_resp)
+                conn.send(bytes(success,encoding='utf-8'))
+                print(success)
+                #print(json.dumps(json_resp, sort_keys=True, indent=4))
 
-
+def new_account(data):
+    if int(data["create"]["initial_balance"]) < 10:
+        proper_exit()
+    resp =  {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"]}
+    return json.dumps(resp)
 def create_auth_file(filename: str):
     try:
         f = open(filename, "x")
