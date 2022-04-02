@@ -1,3 +1,4 @@
+import configparser
 import sys
 
 from utils import *
@@ -7,6 +8,13 @@ from tempfile import mkstemp
 import shutil
 
 # bank server
+
+
+def validate_args(args) -> Response:
+  #  if len(args.filename) > 1 | len(args.port) > 1:
+   #     return Response(False, 'Arguments cannot be duplicate')
+    print(args)
+    return Response(True, args)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -20,7 +28,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def server(args):
+def run_server(args):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     port = args.port
     s.bind(('', port))
@@ -57,9 +65,17 @@ def main() -> None:
         parser.print_help()
         proper_exit('', 0)
 
-    args = parser.parse_args()
-    create_auth_file(args.filename)
-    server(args)
+    try:
+        args = parser.parse_args()
+        response = validate_args(args)
+        if response.success:
+            args = response.result
+            create_auth_file(args.filename)
+            run_server(args)
+        else:
+            proper_exit(response.result)
+    except argparse.ArgumentError as er:
+        parser.error(str(er))
 
 
 if __name__ == '__main__':
