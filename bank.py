@@ -6,6 +6,7 @@ import socket
 import argparse
 import json
 import signal
+import os,binascii
 from decimal import *
 from tempfile import mkstemp
 import shutil
@@ -92,55 +93,71 @@ def run_server(args):
 
             json_resp = json.loads(data.decode('utf-8'))  # convert str to json
 
-            if len(data.decode('utf-8')) <= 0 :
+            if len(data.decode('utf-8')) <= 0:
                 conn.close()
                 continue
 
-            if "create" in json_resp:
-                response = new_account(json_resp)
-                if response.success:
-                    print(response.result)
-                    conn.send(bytes(response.result, encoding='utf-8'))
-                else:
-                    conn.send(bytes(response.result, encoding='utf-8'))
+            challenge = '123456'
+            conn.send(bytes(challenge, encoding='utf-8'))
+            print("sent challenge"+challenge)
 
+            challenge_response = conn.recv(1024)
+            print("received chal response "+challenge_response.decode())
+            #content = open("bank.auth", "r")
+            content = 'xxxxyyyyzzzzxxxx'
+
+            if decrypt(key=content, data=challenge_response.decode()):
+                print("client authenticated")
+
+                if "create" in json_resp:
+                    response = new_account(json_resp)
+                    if response.success:
+                        print(response.result)
+                        conn.send(bytes(response.result, encoding='utf-8'))
+                    else:
+                        conn.send(bytes(response.result, encoding='utf-8'))
+
+                    conn.close()
+                    continue
+
+                if "deposit" in json_resp:
+                    response = deposit(json_resp)
+                    if response.success:
+                        print(response.result)
+                        conn.send(bytes(response.result, encoding='utf-8'))
+                    else:
+                        conn.send(bytes(response.result, encoding='utf-8'))
+
+                    conn.close()
+                    continue
+
+                if "withdraw" in json_resp:
+                    response = withdraw(json_resp)
+                    if response.success:
+                        print(response.result)
+                        conn.send(bytes(response.result, encoding='utf-8'))
+                    else:
+                        conn.send(bytes(response.result, encoding='utf-8'))
+
+                    conn.close()
+                    continue
+
+                if 'get' in json_resp:
+                    response = get_balance(json_resp)
+                    if response.success:
+                        print(response.result)
+                        conn.send(bytes(response.result, encoding='utf-8'))
+                    else:
+                        conn.send(bytes(response.result, encoding='utf-8'))
+
+                    conn.close()
+                    continue
+            else:
                 conn.close()
                 continue
-
-            if "deposit" in json_resp:
-                response = deposit(json_resp)
-                if response.success:
-                    print(response.result)
-                    conn.send(bytes(response.result, encoding='utf-8'))
-                else:
-                    conn.send(bytes(response.result, encoding='utf-8'))
-
-                conn.close()
-                continue
-
-            if "withdraw" in json_resp:
-                response = withdraw(json_resp)
-                if response.success:
-                    print(response.result)
-                    conn.send(bytes(response.result, encoding='utf-8'))
-                else:
-                    conn.send(bytes(response.result, encoding='utf-8'))
-
-                conn.close()
-                continue
-
-            if 'get' in json_resp:
-                response = get_balance(json_resp)
-                if response.success:
-                    print(response.result)
-                    conn.send(bytes(response.result, encoding='utf-8'))
-                else:
-                    conn.send(bytes(response.result, encoding='utf-8'))
-
-                conn.close()
-                continue
-
     except KeyboardInterrupt:
+        conn.close()
+        s.close()
         proper_exit('SIGTERM')
 
 

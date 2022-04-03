@@ -76,9 +76,17 @@ def run_atm(args):
 
             create_card_file(args)
 
-
         data = json.dumps(m)
         s.sendall(bytes(data, encoding="utf-8"))
+
+        challenge = s.recv(1024)
+        print("received chal "+challenge.decode())
+
+    #content = open("bank.auth", "r")
+        content = 'xxxxyyyyzzzzxxxx'
+        challenge_response = encrypt(key=content, data=challenge)
+
+        s.sendall(bytes(challenge_response, encoding="utf-8"))
 
         data = s.recv(1024)
         if data.decode() == '255':

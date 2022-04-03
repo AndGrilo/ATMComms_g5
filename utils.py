@@ -13,8 +13,6 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 
 
-Person = namedtuple('Person', ['group', 'name'])
-Event = namedtuple('Event', ['timestamp', 'person', 'action', 'room'])
 Response = namedtuple('Response', ['success', 'result'])
 SEED = f"|{math.pi:.8f}|{math.e:.8f}"
 
