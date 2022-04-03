@@ -26,9 +26,6 @@ def create_card_file(args) -> Response:
     key = "".join(password)
     h = hmac.new(bytes(key, encoding='utf-8'), args.account.encode(), hashlib.sha256).hexdigest()
 
-
-
-
     if args.card_file:
         fname = args.card_file
     else:

@@ -64,7 +64,6 @@ def withdraw(data) -> Response:
         return Response(False, '255')
 
 
-
 def get_balance(data) -> Response:
     if data["get"]["account"] in users:
         resp = {"account": data["get"]["account"], "balance": users[data["get"]["account"]]["balance"]}
