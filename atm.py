@@ -5,6 +5,10 @@ from utils import *
 import socket
 import argparse
 import json
+import hmac
+import hashlib
+import string
+import random
 from tempfile import mkstemp
 import shutil
 
@@ -26,18 +30,19 @@ def run_atm(args):
         if args.deposit_amount:
             m = {
                 "deposit":{"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address, "port": args.port,
-                          "card_file": args.card_file, "deposit_amount": args.deposit_amount}
+                          "card_file": args.card_file, "deposit": args.deposit_amount}
             }
         if args.withdraw_amount:
             m = {
                 "withdraw":{"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address, "port": args.port,
-                          "card_file": args.card_file, "withdraw_amountS": args.withdraw_amount}
+                          "card_file": args.card_file, "withdraw": args.withdraw_amount}
             }
         if args.balance:
             m = {
                 "create":{"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address, "port": args.port,
                           "card_file": args.card_file, "initial_balance": args.balance}
             }
+            card_file(m["create"]["account"])
 
 
 
@@ -55,7 +60,19 @@ def run_atm(args):
 
         print(f"Received {data!r}")
 
-
+def card_file(user):
+    characters = list(string.ascii_letters + string.digits + "!@#$%^&*()")
+    random.shuffle(characters)
+    password = []
+    for i in range(16):
+        password.append(random.choice(characters))
+    random.shuffle(password)
+    key = "".join(password)
+    h = hmac.new( bytes(key,encoding='utf-8'), user.encode(), hashlib.sha256 ).hexdigest()
+    fname = user + ".card"
+    f = open(fname,"a")
+    f.write(user+":"+h)
+    f.close
 def validate_args(args) -> Response:
     #  if len(args.filename) > 1 | len(args.port) > 1:
     #     return Response(False, 'Arguments cannot be duplicate')
@@ -83,9 +100,9 @@ def create_parser() -> argparse.ArgumentParser:
     commands.add_argument('-c', metavar='card_file', type=str, dest='card_file', help='The customer card file')
 
     mode = commands.add_mutually_exclusive_group()
-    mode.add_argument('-n', metavar='balance', type=int, dest='balance', help='Create a new account with given balance')
-    mode.add_argument('-d', metavar='deposit_amount', type=int, dest='deposit_amount', help='Amount to deposit')
-    mode.add_argument('-w', metavar='withdraw_amount', type=int, dest='withdraw_amount', help='Amount to withdraw')
+    mode.add_argument('-n', metavar='balance', type=float, dest='balance', help='Create a new account with given balance')
+    mode.add_argument('-d', metavar='deposit_amount', type=float, dest='deposit_amount', help='Amount to deposit')
+    mode.add_argument('-w', metavar='withdraw_amount', type=float, dest='withdraw_amount', help='Amount to withdraw')
     mode.add_argument('-g', action='store_const', const='get', dest='get', help='Get balance')
 
     return parser

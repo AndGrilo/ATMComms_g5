@@ -5,12 +5,13 @@ from utils import *
 import socket
 import argparse
 import json
+from decimal import *
 from tempfile import mkstemp
 import shutil
 
 
 # bank server
-
+users = {}
 
 def validate_args(args) -> Response:
     #  if len(args.filename) > 1 | len(args.port) > 1:
@@ -44,34 +45,90 @@ def run_server(args):
     s.listen()
     print("listening on port ", port)
 
-    conn, addr = s.accept()
-    with conn:
-        print("Connection received from: ", addr)
-        while True:
-            #print("olá")
-            data = conn.recv(1024)
-            if data.decode('utf-8') == 'exit\n':
-                conn.close()
-                break
-            if len(data.decode('utf-8')) <= 0 :
-                continue
+    #conn, addr = s.accept()
+    #with conn:
+        #print("Connection received from: ", addr)
+    while True:
+        #print("olá")
+        conn, addr = s.accept()
+        data = conn.recv(1024)
+        if data.decode('utf-8') == 'exit\n':
+            conn.close()
+            break
+        if len(data.decode('utf-8')) <= 0 :
+            conn.close()
+            continue
 
-            json_resp = json.loads(data.decode('utf-8')) # convert str to json
-            if json_resp["create"]:
-                success = new_account(json_resp)
-                conn.send(bytes(success,encoding='utf-8'))
-                print(success)
-                continue
-                #print(json.dumps(json_resp, sort_keys=True, indent=4))
-            #if json_resp["deposit"]:
+        json_resp = json.loads(data.decode('utf-8')) # convert str to json
+        if "create" in json_resp:
+            success = new_account(json_resp)
+            conn.send(bytes(success,encoding='utf-8'))
+            print(success)
+            #print(users)
+            conn.close()
+            continue
+        if "deposit" in json_resp:
+            success = deposit(json_resp)
+            conn.send(bytes(success,encoding='utf-8'))
+            print(success)
+            #print(users)
+            conn.close()
+            continue
+        if "withdraw" in json_resp:
+            success = withdraw(json_resp)
+            conn.send(bytes(success,encoding='utf-8'))
+            print(success)
+            #print(users)
+            conn.close()
+            continue
+        if 'get' in json_resp:
+            success = get_balance(json_resp)
+            conn.send(bytes(success,encoding='utf-8'))
+            print(success)
+            #print(users)
+            conn.close()
+            continue
+
 
 
 def new_account(data):
-    if int(data["create"]["initial_balance"]) < 10:
+    if float(data["create"]["initial_balance"]) < 10.00 or data["create"]["account"] in users:
         proper_exit()
-    resp =  {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"]}
+    resp =  {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"]}
+#    users = {
+#        data["create"]["account"]: resp
+#    }
+    users.update({data["create"]["account"]: resp})
     return json.dumps(resp)
-#def deposit(data):
+
+def deposit(data):
+    if float(data["deposit"]["deposit"]) <= 0.00:
+        proper_exit()
+    if data["deposit"]["account"] in users:
+        users[data["deposit"]["account"]]["balance"] += float(data["deposit"]["deposit"])
+        resp = {"account":data["deposit"]["account"],"deposit":data["deposit"]["deposit"]}
+        return json.dumps(resp)
+    else:
+        proper_exit()
+
+def withdraw(data):
+    if float(data["withdraw"]["withdraw"]) <= 0.00 or (users[data["withdraw"]["account"]]["balance"]-data["withdraw"]["withdraw"]) < 0.00:
+        proper_exit()
+    if data["withdraw"]["account"] in users:
+        users[data["withdraw"]["account"]]["balance"] -= float(data["withdraw"]["withdraw"])
+        resp = {"account":data["withdraw"]["account"],"withdraw":data["withdraw"]["withdraw"]}
+        return json.dumps(resp)
+    else:
+        proper_exit()
+
+def get_balance(data):
+    if data["get"]["account"] in users:
+        resp = {"account":data["get"]["account"],"balance":users[data["get"]["account"]]["balance"]}
+        return json.dumps(resp)
+    else:
+        proper_exit()
+
+
 
 def create_auth_file(filename: str):
     try:
