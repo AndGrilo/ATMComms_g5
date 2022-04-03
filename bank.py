@@ -5,18 +5,137 @@ from utils import *
 import socket
 import argparse
 import json
+import signal
 from decimal import *
 from tempfile import mkstemp
 import shutil
 
-
 # bank server
 users = {}
+
+
+def new_account(data) -> Response:
+    if float(data["create"]["initial_balance"]) < 10.00:
+        return Response(False, 'minimum initial balance must be 10')
+
+    if data["create"]["account"] in users:
+        return Response(False, 'account already exists')
+
+    resp = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"]}
+    #    users = {
+    #        data["create"]["account"]: resp
+    #    }
+    users.update({data["create"]["account"]: resp})
+
+    return Response(True, json.dumps(resp))
+
+
+def deposit(data) -> Response:
+    if float(data["deposit"]["deposit"]) <= 0.00:
+        return Response(False, 'invalid amount to deposit')
+
+    if data["deposit"]["account"] in users:
+        users[data["deposit"]["account"]]["balance"] += float(data["deposit"]["deposit"])
+        resp = {"account": data["deposit"]["account"], "deposit": data["deposit"]["deposit"]}
+        return Response(True, json.dumps(resp))
+    else:
+        return Response(False, 'account does not exist')
+
+
+def withdraw(data) -> Response:
+    if float(data["withdraw"]["withdraw"]) <= 0.00:
+        return Response(False, 'invalid amount to withdraw')
+
+    if data["withdraw"]["account"] in users:
+        if (users[data["withdraw"]["account"]]["balance"] - data["withdraw"]["withdraw"]) < 0.00:
+            return Response(False, 'not enough balance to withdraw that amount')
+
+        users[data["withdraw"]["account"]]["balance"] -= float(data["withdraw"]["withdraw"])
+        resp = {"account": data["withdraw"]["account"], "withdraw": data["withdraw"]["withdraw"]}
+        return Response(True, json.dumps(resp))
+    else:
+        return Response(False, 'account does not exist')
+
+
+
+def get_balance(data) -> Response:
+    if data["get"]["account"] in users:
+        resp = {"account": data["get"]["account"], "balance": users[data["get"]["account"]]["balance"]}
+        return Response(True, json.dumps(resp))
+    else:
+        return Response(False, 'account does not exist')
+
+
+def run_server(args):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error as err:
+        print("socket creation failed with error %s" % err)
+
+    port = args.port
+
+    s.bind(('', port))
+    s.listen()
+    print("listening on port ", port)
+
+    try:
+        while True:
+            conn, addr = s.accept()
+            data = conn.recv(1024)
+
+            json_resp = json.loads(data.decode('utf-8'))  # convert str to json
+            if "create" in json_resp:
+                response = new_account(json_resp)
+
+                print(response.result)
+                conn.send(bytes(response.result, encoding='utf-8'))
+                # print(users)
+                conn.close()
+                continue
+
+            if "deposit" in json_resp:
+                response = deposit(json_resp)
+                print(response.result)
+                conn.send(bytes(response.result, encoding='utf-8'))
+
+                # print(users)
+                conn.close()
+                continue
+
+            if "withdraw" in json_resp:
+                response = withdraw(json_resp)
+                print(response.result)
+                conn.send(bytes(response.result, encoding='utf-8'))
+
+                # print(users)
+                conn.close()
+                continue
+
+            if 'get' in json_resp:
+                response = get_balance(json_resp)
+                print(response.result)
+                conn.send(bytes(response.result, encoding='utf-8'))
+
+                # print(users)
+                conn.close()
+                continue
+    except KeyboardInterrupt:
+        proper_exit('SIGTERM')
+
+
+def create_auth_file(filename: str):
+    try:
+        f = open(filename, "x")
+        f.write(filename)
+        f.close()
+        print("created")
+    except Exception:
+        proper_exit('File exists')
+
 
 def validate_args(args) -> Response:
     #  if len(args.filename) > 1 | len(args.port) > 1:
     #     return Response(False, 'Arguments cannot be duplicate')
-    print(args)
     return Response(True, args)
 
 
@@ -32,117 +151,9 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_server(args):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("Socket successfully created")
-    except socket.error as err:
-        print("socket creation failed with error %s" % err)
-
-    port = args.port
-
-    s.bind(('', port))
-    s.listen()
-    print("listening on port ", port)
-
-    #conn, addr = s.accept()
-    #with conn:
-        #print("Connection received from: ", addr)
-    while True:
-        #print("olá")
-        conn, addr = s.accept()
-        data = conn.recv(1024)
-        if data.decode('utf-8') == 'exit\n':
-            conn.close()
-            break
-        if len(data.decode('utf-8')) <= 0 :
-            conn.close()
-            continue
-
-        json_resp = json.loads(data.decode('utf-8')) # convert str to json
-        if "create" in json_resp:
-            success = new_account(json_resp)
-            conn.send(bytes(success,encoding='utf-8'))
-            print(success)
-            #print(users)
-            conn.close()
-            continue
-        if "deposit" in json_resp:
-            success = deposit(json_resp)
-            conn.send(bytes(success,encoding='utf-8'))
-            print(success)
-            #print(users)
-            conn.close()
-            continue
-        if "withdraw" in json_resp:
-            success = withdraw(json_resp)
-            conn.send(bytes(success,encoding='utf-8'))
-            print(success)
-            #print(users)
-            conn.close()
-            continue
-        if 'get' in json_resp:
-            success = get_balance(json_resp)
-            conn.send(bytes(success,encoding='utf-8'))
-            print(success)
-            #print(users)
-            conn.close()
-            continue
-
-
-
-def new_account(data):
-    if float(data["create"]["initial_balance"]) < 10.00 or data["create"]["account"] in users:
-        proper_exit()
-    resp =  {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"]}
-#    users = {
-#        data["create"]["account"]: resp
-#    }
-    users.update({data["create"]["account"]: resp})
-    return json.dumps(resp)
-
-def deposit(data):
-    if float(data["deposit"]["deposit"]) <= 0.00:
-        proper_exit()
-    if data["deposit"]["account"] in users:
-        users[data["deposit"]["account"]]["balance"] += float(data["deposit"]["deposit"])
-        resp = {"account":data["deposit"]["account"],"deposit":data["deposit"]["deposit"]}
-        return json.dumps(resp)
-    else:
-        proper_exit()
-
-def withdraw(data):
-    if float(data["withdraw"]["withdraw"]) <= 0.00 or (users[data["withdraw"]["account"]]["balance"]-data["withdraw"]["withdraw"]) < 0.00:
-        proper_exit()
-    if data["withdraw"]["account"] in users:
-        users[data["withdraw"]["account"]]["balance"] -= float(data["withdraw"]["withdraw"])
-        resp = {"account":data["withdraw"]["account"],"withdraw":data["withdraw"]["withdraw"]}
-        return json.dumps(resp)
-    else:
-        proper_exit()
-
-def get_balance(data):
-    if data["get"]["account"] in users:
-        resp = {"account":data["get"]["account"],"balance":users[data["get"]["account"]]["balance"]}
-        return json.dumps(resp)
-    else:
-        proper_exit()
-
-
-
-def create_auth_file(filename: str):
-    try:
-        f = open(filename, "x")
-        f.write(filename)
-        f.close()
-        print("created")
-    except Exception:
-        proper_exit('File exists')
-
-
 def main() -> None:
-    #if is_admin():
-        #proper_exit('Error: the script must run as unprivileged/regular user')
+    # if is_admin():
+    # proper_exit('Error: the script must run as unprivileged/regular user')
 
     parser = create_parser()
 
@@ -157,6 +168,10 @@ def main() -> None:
             proper_exit(response.result)
     except argparse.ArgumentError as er:
         parser.error(str(er))
+
+
+def __init__(self):
+    signal.signal(signal.SIGTERM, proper_exit('SIGTERM'))
 
 
 if __name__ == '__main__':
