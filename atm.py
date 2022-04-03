@@ -16,6 +16,35 @@ import shutil
 # client atm
 
 
+def create_card_file(args) -> Response:
+    characters = list(string.ascii_letters + string.digits + "!@#$%^&*()")
+    random.shuffle(characters)
+    password = []
+    for i in range(16):
+        password.append(random.choice(characters))
+    random.shuffle(password)
+    key = "".join(password)
+    h = hmac.new(bytes(key, encoding='utf-8'), args.account.encode(), hashlib.sha256).hexdigest()
+
+
+
+
+    if args.card_file:
+        fname = args.card_file
+    else:
+        fname = args.account + ".card"
+    try:
+        f = open(fname, "x")
+        f.write(args.account + ":" + h)
+
+        f.close
+    except Exception:
+        return Response(False, 'card file exists')
+        exit(255)
+
+    return Response(True, h)
+
+
 def run_atm(args):
     host = args.ip_address
     port = args.port
@@ -47,30 +76,18 @@ def run_atm(args):
                            "port": args.port,
                            "card_file": args.card_file, "initial_balance": args.balance}
             }
-            card_file(m["create"]["account"])
+
+            create_card_file(args)
+
 
         data = json.dumps(m)
-
         s.sendall(bytes(data, encoding="utf-8"))
 
         data = s.recv(1024)
+        if data.decode() == '255':
+            exit(255)
 
         print(f"Received {data!r}")
-
-
-def card_file(user):
-    characters = list(string.ascii_letters + string.digits + "!@#$%^&*()")
-    random.shuffle(characters)
-    password = []
-    for i in range(16):
-        password.append(random.choice(characters))
-    random.shuffle(password)
-    key = "".join(password)
-    h = hmac.new(bytes(key, encoding='utf-8'), user.encode(), hashlib.sha256).hexdigest()
-    fname = user + ".card"
-    f = open(fname, "a")
-    f.write(user + ":" + h)
-    f.close
 
 
 def validate_args(args) -> Response:

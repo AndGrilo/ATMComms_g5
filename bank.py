@@ -16,10 +16,12 @@ users = {}
 
 def new_account(data) -> Response:
     if float(data["create"]["initial_balance"]) < 10.00:
-        return Response(False, 'minimum initial balance must be 10')
+        #return Response(False, 'minimum initial balance must be 10')
+        return Response(False, '255')
 
     if data["create"]["account"] in users:
-        return Response(False, 'account already exists')
+        #return Response(False, 'account already exists')
+        return Response(False, '255')
 
     resp = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"]}
     #    users = {
@@ -32,29 +34,34 @@ def new_account(data) -> Response:
 
 def deposit(data) -> Response:
     if float(data["deposit"]["deposit"]) <= 0.00:
-        return Response(False, 'invalid amount to deposit')
+        #return Response(False, 'invalid amount to deposit')
+        return Response(False, '255')
 
     if data["deposit"]["account"] in users:
         users[data["deposit"]["account"]]["balance"] += float(data["deposit"]["deposit"])
         resp = {"account": data["deposit"]["account"], "deposit": data["deposit"]["deposit"]}
         return Response(True, json.dumps(resp))
     else:
-        return Response(False, 'account does not exist')
+        #return Response(False, 'account does not exist')
+        return Response(False, '255')
 
 
 def withdraw(data) -> Response:
     if float(data["withdraw"]["withdraw"]) <= 0.00:
-        return Response(False, 'invalid amount to withdraw')
+        #return Response(False, 'invalid amount to withdraw')
+        return Response(False, '255')
 
     if data["withdraw"]["account"] in users:
         if (users[data["withdraw"]["account"]]["balance"] - data["withdraw"]["withdraw"]) < 0.00:
-            return Response(False, 'not enough balance to withdraw that amount')
+            #return Response(False, 'not enough balance to withdraw that amount')
+            return Response(False, '255')
 
         users[data["withdraw"]["account"]]["balance"] -= float(data["withdraw"]["withdraw"])
         resp = {"account": data["withdraw"]["account"], "withdraw": data["withdraw"]["withdraw"]}
         return Response(True, json.dumps(resp))
     else:
-        return Response(False, 'account does not exist')
+        #return Response(False, 'account does not exist')
+        return Response(False, '255')
 
 
 
@@ -63,7 +70,8 @@ def get_balance(data) -> Response:
         resp = {"account": data["get"]["account"], "balance": users[data["get"]["account"]]["balance"]}
         return Response(True, json.dumps(resp))
     else:
-        return Response(False, 'account does not exist')
+        #return Response(False, 'account does not exist')
+        return Response(False, '255')
 
 
 def run_server(args):
@@ -84,41 +92,55 @@ def run_server(args):
             data = conn.recv(1024)
 
             json_resp = json.loads(data.decode('utf-8'))  # convert str to json
+
+            if len(data.decode('utf-8')) <= 0 :
+                conn.close()
+                continue
+
             if "create" in json_resp:
                 response = new_account(json_resp)
+                if response.success:
+                    print(response.result)
+                    conn.send(bytes(response.result, encoding='utf-8'))
+                else:
+                    conn.send(bytes(response.result, encoding='utf-8'))
 
-                print(response.result)
-                conn.send(bytes(response.result, encoding='utf-8'))
-                # print(users)
                 conn.close()
                 continue
 
             if "deposit" in json_resp:
                 response = deposit(json_resp)
-                print(response.result)
-                conn.send(bytes(response.result, encoding='utf-8'))
+                if response.success:
+                    print(response.result)
+                    conn.send(bytes(response.result, encoding='utf-8'))
+                else:
+                    conn.send(bytes(response.result, encoding='utf-8'))
 
-                # print(users)
                 conn.close()
                 continue
 
             if "withdraw" in json_resp:
                 response = withdraw(json_resp)
-                print(response.result)
-                conn.send(bytes(response.result, encoding='utf-8'))
+                if response.success:
+                    print(response.result)
+                    conn.send(bytes(response.result, encoding='utf-8'))
+                else:
+                    conn.send(bytes(response.result, encoding='utf-8'))
 
-                # print(users)
                 conn.close()
                 continue
 
             if 'get' in json_resp:
                 response = get_balance(json_resp)
-                print(response.result)
-                conn.send(bytes(response.result, encoding='utf-8'))
+                if response.success:
+                    print(response.result)
+                    conn.send(bytes(response.result, encoding='utf-8'))
+                else:
+                    conn.send(bytes(response.result, encoding='utf-8'))
 
-                # print(users)
                 conn.close()
                 continue
+
     except KeyboardInterrupt:
         proper_exit('SIGTERM')
 
