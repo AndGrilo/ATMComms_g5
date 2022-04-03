@@ -156,11 +156,10 @@ def run_server(args):
                         continue
                 else:
                     conn.close()
-                    s.close()
+                    #s.close()
                     print("client NOT authenticated, challenge differ")
-                    continue
+                    #continue
 
-                s.close()
                 conn.close()
                 continue
         except KeyboardInterrupt:
