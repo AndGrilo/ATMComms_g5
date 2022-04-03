@@ -1,5 +1,7 @@
 import os
 import re
+import string
+import random
 import sys
 import math
 import pickle
@@ -18,8 +20,7 @@ SEED = f"|{math.pi:.8f}|{math.e:.8f}"
 
 
 def encrypt(key: str, data, encode: bool = True):
-    salt = str(SHA256.new(str(str(key).swapcase() + SEED).encode('utf-8')).hexdigest())
-    key = SHA256.new(str(key + salt).encode('utf-8')).digest()
+    key = SHA256.new(key.encode('utf-8')).digest()
     iv = Random.new().read(AES.block_size)
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     padding = AES.block_size - len(data) % AES.block_size
@@ -29,16 +30,28 @@ def encrypt(key: str, data, encode: bool = True):
 
 
 def decrypt(key: str, data, decode: bool = True):
-    salt = str(SHA256.new(str(str(key).swapcase() + SEED).encode('utf-8')).hexdigest())
-    key = SHA256.new(str(key + salt).encode('utf-8')).digest()
-    data = base64.b64decode(data.encode('utf-8')) if decode else data
-    iv = data[:AES.block_size]
-    decryptor = AES.new(key, AES.MODE_CBC, iv)
-    data = decryptor.decrypt(data[AES.block_size:])
-    padding = data[-1]
-    if data[-padding:] != bytes([padding]) * padding:
-        raise ValueError("Invalid padding...")
-    return data[:-padding]
+    try:
+        key = SHA256.new(key.encode('utf-8')).digest()
+        data = base64.b64decode(data.encode('utf-8')) if decode else data
+        iv = data[:AES.block_size]
+        decryptor = AES.new(key, AES.MODE_CBC, iv)
+        data = decryptor.decrypt(data[AES.block_size:])
+        padding = data[-1]
+        return data[:-padding]
+    except Exception:
+        return data
+
+
+def generate_random_string(str_size: int):
+    characters = list(string.ascii_letters + string.digits + "!@#$%^&*()")
+    random.shuffle(characters)
+    password = []
+    for i in range(str_size):
+        password.append(random.choice(characters))
+    random.shuffle(password)
+    result = "".join(password)
+
+    return result
 
 
 def create_database(token: str, path: str) -> Response:

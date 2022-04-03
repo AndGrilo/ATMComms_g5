@@ -17,13 +17,7 @@ import shutil
 
 
 def create_card_file(args) -> Response:
-    characters = list(string.ascii_letters + string.digits + "!@#$%^&*()")
-    random.shuffle(characters)
-    password = []
-    for i in range(16):
-        password.append(random.choice(characters))
-    random.shuffle(password)
-    key = "".join(password)
+    key = generate_random_string(16)
     h = hmac.new(bytes(key, encoding='utf-8'), args.account.encode(), hashlib.sha256).hexdigest()
 
     if args.card_file:
@@ -33,11 +27,9 @@ def create_card_file(args) -> Response:
     try:
         f = open(fname, "x")
         f.write(args.account + ":" + h)
-
         f.close
     except Exception:
         return Response(False, 'card file exists')
-        exit(255)
 
     return Response(True, h)
 
@@ -46,53 +38,57 @@ def run_atm(args):
     host = args.ip_address
     port = args.port
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
-        # TO DO
-        if args.get:
-            m = {
-                "get": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                        "port": args.port,
-                        "card_file": args.card_file, "get": args.get}
-            }
-        if args.deposit_amount:
-            m = {
-                "deposit": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((host, port))
+            # TO DO
+            if args.get:
+                m = {
+                    "get": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                             "port": args.port,
-                            "card_file": args.card_file, "deposit": args.deposit_amount}
-            }
-        if args.withdraw_amount:
-            m = {
-                "withdraw": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                             "port": args.port,
-                             "card_file": args.card_file, "withdraw": args.withdraw_amount}
-            }
-        if args.balance:
-            m = {
-                "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                           "port": args.port,
-                           "card_file": args.card_file, "initial_balance": args.balance}
-            }
+                            "card_file": args.card_file, "get": args.get}
+                }
+            if args.deposit_amount:
+                m = {
+                    "deposit": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                                "port": args.port,
+                                "card_file": args.card_file, "deposit": args.deposit_amount}
+                }
+            if args.withdraw_amount:
+                m = {
+                    "withdraw": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                                 "port": args.port,
+                                 "card_file": args.card_file, "withdraw": args.withdraw_amount}
+                }
+            if args.balance:
+                m = {
+                    "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                               "port": args.port,
+                               "card_file": args.card_file, "initial_balance": args.balance}
+                }
 
-            create_card_file(args)
+                create_card_file(args)
 
-        data = json.dumps(m)
-        s.sendall(bytes(data, encoding="utf-8"))
+            data = json.dumps(m)
+            s.sendall(bytes(data, encoding="utf-8"))
 
-        challenge = s.recv(1024)
-        print("received chal "+challenge.decode())
+            challenge = s.recv(1024)
+            print("received chal "+challenge.decode())
 
-    #content = open("bank.auth", "r")
-        content = 'xxxxyyyyzzzzxxxx'
-        challenge_response = encrypt(key=content, data=challenge)
+            content = open(args.auth_file, "r").read().rstrip()
 
-        s.sendall(bytes(challenge_response, encoding="utf-8"))
+            challenge_response = encrypt(key=content, data=challenge)
 
-        data = s.recv(1024)
-        if data.decode() == '255':
-            exit(255)
+            s.sendall(bytes(challenge_response, encoding="utf-8"))
 
-        print(f"Received {data!r}")
+            data = s.recv(1024)
+            if data.decode() == '255':
+                exit(255)
+
+            print(f"Received {data!r}")
+
+    except Exception:
+        exit(63)
 
 
 def validate_args(args) -> Response:
@@ -104,6 +100,12 @@ def validate_args(args) -> Response:
 
     if not args.balance and not args.deposit_amount and not args.withdraw_amount and not args.get:
         return Response(False, 'a mode of operations must be provided (-n | -d | -w | -g)')
+
+    if not args.auth_file:
+        args.auth_file = "bank.auth"
+
+    if not args.card_file:
+        args.card_file = args.account+".card"
 
     return Response(True, args)
 

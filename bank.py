@@ -82,89 +82,103 @@ def run_server(args):
 
     port = args.port
 
-    s.bind(('', port))
-    s.listen()
-    print("listening on port ", port)
-
     try:
-        while True:
-            conn, addr = s.accept()
-            data = conn.recv(1024)
+        s.bind(('', port))
+        s.listen()
 
-            json_resp = json.loads(data.decode('utf-8'))  # convert str to json
+        try:
+            while True:
+                conn, addr = s.accept()
+                data = conn.recv(1024)
 
-            if len(data.decode('utf-8')) <= 0:
+                json_resp = json.loads(data.decode('utf-8'))  # convert str to json
+
+                if len(data.decode('utf-8')) <= 0:
+                    conn.close()
+                    continue
+
+                challenge = generate_random_string(16)
+                conn.send(bytes(challenge, encoding='utf-8'))
+                print("sent challenge "+challenge)
+
+                challenge_response = conn.recv(1024)
+                print("received chal response "+challenge_response.decode())
+
+                content = open(args.filename, "r").read()
+
+                challenge_response_solution = decrypt(key=content, data=challenge_response.decode())
+
+                if challenge_response_solution.decode() == challenge:
+                    print("client authenticated, challenge matches")
+
+                    if "create" in json_resp:
+                        response = new_account(json_resp)
+                        if response.success:
+                            print(response.result)
+                            conn.send(bytes(response.result, encoding='utf-8'))
+                        else:
+                            conn.send(bytes(response.result, encoding='utf-8'))
+
+                        conn.close()
+                        continue
+
+                    if "deposit" in json_resp:
+                        response = deposit(json_resp)
+                        if response.success:
+                            print(response.result)
+                            conn.send(bytes(response.result, encoding='utf-8'))
+                        else:
+                            conn.send(bytes(response.result, encoding='utf-8'))
+
+                        conn.close()
+                        continue
+
+                    if "withdraw" in json_resp:
+                        response = withdraw(json_resp)
+                        if response.success:
+                            print(response.result)
+                            conn.send(bytes(response.result, encoding='utf-8'))
+                        else:
+                            conn.send(bytes(response.result, encoding='utf-8'))
+
+                        conn.close()
+                        continue
+
+                    if 'get' in json_resp:
+                        response = get_balance(json_resp)
+                        if response.success:
+                            print(response.result)
+                            conn.send(bytes(response.result, encoding='utf-8'))
+                        else:
+                            conn.send(bytes(response.result, encoding='utf-8'))
+
+                        conn.close()
+                        continue
+                else:
+                    conn.close()
+                    s.close()
+                    print("client NOT authenticated, challenge differ")
+                    continue
+
+                s.close()
                 conn.close()
                 continue
-
-            challenge = '123456'
-            conn.send(bytes(challenge, encoding='utf-8'))
-            print("sent challenge"+challenge)
-
-            challenge_response = conn.recv(1024)
-            print("received chal response "+challenge_response.decode())
-            #content = open("bank.auth", "r")
-            content = 'xxxxyyyyzzzzxxxx'
-
-            if decrypt(key=content, data=challenge_response.decode()):
-                print("client authenticated")
-
-                if "create" in json_resp:
-                    response = new_account(json_resp)
-                    if response.success:
-                        print(response.result)
-                        conn.send(bytes(response.result, encoding='utf-8'))
-                    else:
-                        conn.send(bytes(response.result, encoding='utf-8'))
-
-                    conn.close()
-                    continue
-
-                if "deposit" in json_resp:
-                    response = deposit(json_resp)
-                    if response.success:
-                        print(response.result)
-                        conn.send(bytes(response.result, encoding='utf-8'))
-                    else:
-                        conn.send(bytes(response.result, encoding='utf-8'))
-
-                    conn.close()
-                    continue
-
-                if "withdraw" in json_resp:
-                    response = withdraw(json_resp)
-                    if response.success:
-                        print(response.result)
-                        conn.send(bytes(response.result, encoding='utf-8'))
-                    else:
-                        conn.send(bytes(response.result, encoding='utf-8'))
-
-                    conn.close()
-                    continue
-
-                if 'get' in json_resp:
-                    response = get_balance(json_resp)
-                    if response.success:
-                        print(response.result)
-                        conn.send(bytes(response.result, encoding='utf-8'))
-                    else:
-                        conn.send(bytes(response.result, encoding='utf-8'))
-
-                    conn.close()
-                    continue
-            else:
-                conn.close()
-                continue
-    except KeyboardInterrupt:
-        conn.close()
+        except KeyboardInterrupt:
+            s.close()
+            conn.close()
+            proper_exit('SIGTERM', 255)
+    except Exception:
         s.close()
-        proper_exit('SIGTERM')
+        proper_exit("protocol error", 63)
 
 
 def create_auth_file(filename: str):
     try:
         f = open(filename, "x")
-        f.write(filename)
+        #f.write("xxxxyyyyxxxxyyyy")
+        content = generate_random_string(16)
+        f.write(content)
+        print("wrote "+content)
         f.close()
         print("created")
     except Exception:
@@ -183,7 +197,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(usage=usage, description=description, exit_on_error=False)
 
     parser.add_argument('-p', type=int, metavar='<port>', dest='port', help='The port to listen on', default=3000)
-    parser.add_argument('-s', type=str, metavar='<auth_file>', dest='filename', help='Name of the auth-file',
+    parser.add_argument('-s', type=str, metavar='<filename>', dest='filename', help='Name of the auth-file',
                         default='bank.auth')
 
     return parser
@@ -209,7 +223,7 @@ def main() -> None:
 
 
 def __init__(self):
-    signal.signal(signal.SIGTERM, proper_exit('SIGTERM'))
+    signal.signal(signal.SIGTERM, proper_exit('SIGTERM', 255))
 
 
 if __name__ == '__main__':
@@ -217,4 +231,4 @@ if __name__ == '__main__':
         main()
     except Exception as err:
         print(err)
-        proper_exit('Program encountered an error during execution and cannot continue. Contact the support team')
+        proper_exit('Program encountered an error during execution and cannot continue')
