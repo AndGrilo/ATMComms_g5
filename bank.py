@@ -74,6 +74,18 @@ def get_balance(data) -> Response:
         return Response(False, '255')
 
 
+def get_card_file_name(data):
+    if "create" in data:
+        card_file_name = data["create"]["card_file"]
+    elif "withdraw" in data:
+        card_file_name = data["withdraw"]["card_file"]
+    elif "deposit" in data:
+        card_file_name = data["deposit"]["card_file"]
+    elif "get" in data:
+        card_file_name = data["get"]["card_file"]
+    return card_file_name
+
+
 def run_server(args):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,13 +101,20 @@ def run_server(args):
         try:
             while True:
                 conn, addr = s.accept()
-                data = conn.recv(1024)
+                print("connected with client")
 
-                json_resp = json.loads(data.decode('utf-8'))  # convert str to json
+                encrypted_command_request = conn.recv(1024)
+                print(encrypted_command_request.decode())
 
-                if len(data.decode('utf-8')) <= 0:
+                content = open(args.filename, "r").read()
+
+                if len(encrypted_command_request.decode('utf-8')) <= 0:
                     conn.close()
                     continue
+
+                denc_json = decrypt(key=content, data=encrypted_command_request.decode())
+                json_resp = json.loads(denc_json.decode('utf-8'))  # convert str to json
+                print(json_resp)
 
                 challenge = generate_random_string(16)
                 conn.send(bytes(challenge, encoding='utf-8'))
@@ -104,9 +123,12 @@ def run_server(args):
                 challenge_response = conn.recv(1024)
                 print("received chal response "+challenge_response.decode())
 
-                content = open(args.filename, "r").read()
+                card_file_name = get_card_file_name(json_resp)
+                print("a card file chama-se " + card_file_name)
+                card_file_content = open(card_file_name, "r").read()
 
-                challenge_response_solution = decrypt(key=content, data=challenge_response.decode())
+                challenge_response_solution = decrypt(key=card_file_content, data=challenge_response.decode())
+                print("chal response solution "+challenge_response_solution.decode())
 
                 if challenge_response_solution.decode() == challenge:
                     print("client authenticated, challenge matches")
@@ -167,7 +189,8 @@ def run_server(args):
             s.close()
             conn.close()
             proper_exit('SIGTERM', 255)
-    except Exception:
+    except Exception as err:
+        print(err)
         s.close()
         proper_exit("protocol error", 63)
 
@@ -191,6 +214,16 @@ def validate_args(args) -> Response:
     return Response(True, args)
 
 
+def check_double_params(listOfElems):
+    setOfElems = set()
+    for elem in listOfElems:
+        if elem in setOfElems:
+            return True
+        else:
+            setOfElems.add(elem)
+    return False
+
+
 def create_parser() -> argparse.ArgumentParser:
     description = 'Bank Server'
     usage = '[-p <port>] [-s <auth-file>]'
@@ -211,6 +244,8 @@ def main() -> None:
 
     try:
         args = parser.parse_args()
+        if check_double_params(sys.argv):
+            exit(255)
         response = validate_args(args)
         if response.success:
             args = response.result

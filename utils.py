@@ -20,26 +20,29 @@ SEED = f"|{math.pi:.8f}|{math.e:.8f}"
 
 
 def encrypt(key: str, data, encode: bool = True):
-    key = SHA256.new(key.encode('utf-8')).digest()
-    iv = Random.new().read(AES.block_size)
-    encryptor = AES.new(key, AES.MODE_CBC, iv)
-    padding = AES.block_size - len(data) % AES.block_size
-    data += bytes([padding]) * padding
-    data = iv + encryptor.encrypt(data)
-    return base64.b64encode(data).decode('utf-8') if encode else data
+    try:
+        key = SHA256.new(key.encode('utf-8')).digest()
+        iv = Random.new().read(AES.block_size)
+        encryptor = AES.new(key, AES.MODE_CBC, iv)
+        padding = AES.block_size - len(data) % AES.block_size
+        data += bytes([padding]) * padding
+        data = iv + encryptor.encrypt(data)
+        return base64.b64encode(data).decode('utf-8') if encode else data
+    except Exception as err:
+        print(err)
 
 
 def decrypt(key: str, data, decode: bool = True):
-    try:
-        key = SHA256.new(key.encode('utf-8')).digest()
-        data = base64.b64decode(data.encode('utf-8')) if decode else data
-        iv = data[:AES.block_size]
-        decryptor = AES.new(key, AES.MODE_CBC, iv)
-        data = decryptor.decrypt(data[AES.block_size:])
-        padding = data[-1]
-        return data[:-padding]
-    except Exception:
-        return data
+
+    key = SHA256.new(key.encode('utf-8')).digest()
+    data = base64.b64decode(data.encode('utf-8')) if decode else data
+    iv = data[:AES.block_size]
+    decryptor = AES.new(key, AES.MODE_CBC, iv)
+    data = decryptor.decrypt(data[AES.block_size:])
+    padding = data[-1]
+    if data[-padding:] != bytes([padding]) * padding:
+        raise ValueError("Invalid padding...")
+    return data[:-padding]
 
 
 def generate_random_string(str_size: int):

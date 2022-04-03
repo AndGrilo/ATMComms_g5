@@ -34,50 +34,63 @@ def create_card_file(args) -> Response:
     return Response(True, h)
 
 
+def structure_command(args):
+    if args.get:
+        m = {
+            "get": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                    "port": args.port,
+                    "card_file": args.card_file, "get": args.get}
+        }
+    if args.deposit_amount:
+        m = {
+            "deposit": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                        "port": args.port,
+                        "card_file": args.card_file, "deposit": args.deposit_amount}
+        }
+    if args.withdraw_amount:
+        m = {
+            "withdraw": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                         "port": args.port,
+                         "card_file": args.card_file, "withdraw": args.withdraw_amount}
+        }
+    if args.balance:
+        m = {
+            "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
+                       "port": args.port,
+                       "card_file": args.card_file, "initial_balance": args.balance}
+        }
+        create_card_file(args)
+
+    return m
+
+
 def run_atm(args):
+
     host = args.ip_address
     port = args.port
+
+    m = structure_command(args)
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((host, port))
-            # TO DO
-            if args.get:
-                m = {
-                    "get": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                            "port": args.port,
-                            "card_file": args.card_file, "get": args.get}
-                }
-            if args.deposit_amount:
-                m = {
-                    "deposit": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                                "port": args.port,
-                                "card_file": args.card_file, "deposit": args.deposit_amount}
-                }
-            if args.withdraw_amount:
-                m = {
-                    "withdraw": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                                 "port": args.port,
-                                 "card_file": args.card_file, "withdraw": args.withdraw_amount}
-                }
-            if args.balance:
-                m = {
-                    "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                               "port": args.port,
-                               "card_file": args.card_file, "initial_balance": args.balance}
-                }
-
-                create_card_file(args)
+            print("connected with server")
 
             data = json.dumps(m)
-            s.sendall(bytes(data, encoding="utf-8"))
-
-            challenge = s.recv(1024)
-            print("received chal "+challenge.decode())
+            print(type(data))
 
             content = open(args.auth_file, "r").read().rstrip()
+            print("encrypting "+data+" with key "+content)
+            encrypted_data = encrypt(key=content, data=bytes(data, encoding='utf-8'))
 
-            challenge_response = encrypt(key=content, data=challenge)
+            print(encrypted_data)
+            s.sendall(bytes(encrypted_data, encoding="utf-8"))
+
+            challenge = s.recv(1024)
+            print(challenge.decode())
+
+            card_file_content = open(args.card_file, "r").read().rstrip()
+            challenge_response = encrypt(key=card_file_content, data=challenge)
 
             s.sendall(bytes(challenge_response, encoding="utf-8"))
 
@@ -85,10 +98,10 @@ def run_atm(args):
             if data.decode() == '255':
                 exit(255)
 
-
             print(f"Received {data!r}")
 
-    except Exception:
+    except Exception as err:
+        print(err)
         exit(63)
 
 
@@ -109,6 +122,16 @@ def validate_args(args) -> Response:
         args.card_file = args.account+".card"
 
     return Response(True, args)
+
+
+def check_double_params(listOfElems):
+    setOfElems = set()
+    for elem in listOfElems:
+        if elem in setOfElems:
+            return True
+        else:
+            setOfElems.add(elem)
+    return False
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -147,6 +170,8 @@ def main() -> None:
 
     try:
         args = parser.parse_args()
+        if check_double_params(sys.argv):
+            exit(255)
         response = validate_args(args)
         if response.success:
             args = response.result
