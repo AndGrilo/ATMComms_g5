@@ -155,10 +155,11 @@ def run_server(args):
                         conn.close()
                         continue
                 else:
+                    conn.send(bytes("255", encoding='utf-8'))
                     conn.close()
                     #s.close()
                     print("client NOT authenticated, challenge differ")
-                    #continue
+
 
                 conn.close()
                 continue
