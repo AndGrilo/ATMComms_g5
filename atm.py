@@ -1,6 +1,3 @@
-import configparser
-import sys
-
 from utils import *
 import socket
 import argparse
@@ -8,10 +5,6 @@ import json
 import hmac
 import hashlib
 import time
-import string
-import random
-from tempfile import mkstemp
-import shutil
 
 
 # client atm
@@ -96,7 +89,7 @@ def run_atm(args):
                     content = open(args.auth_file, "r").read().rstrip()
                 except FileNotFoundError:
                     # print("auth file does not exist")
-                    exit(63)
+                    exit(255)
 
                 # print("encrypting "+data+" with key "+content)
                 encrypted_data = encrypt(key=content, data=bytes(data, encoding='utf-8'))
@@ -111,7 +104,7 @@ def run_atm(args):
                     card_file_content = open(args.card_file, "r").read().rstrip()
                 except FileNotFoundError:
                     # print("card file does not exist")
-                    exit(63)
+                    exit(255)
 
                 challenge_response = encrypt(key=card_file_content, data=challenge)
 
@@ -193,7 +186,7 @@ def main() -> None:
 
     if len(sys.argv) == 1:
         parser.print_help()
-        proper_exit('', 0)
+        exit(0)
 
     try:
         args = parser.parse_args()

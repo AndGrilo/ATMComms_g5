@@ -1,16 +1,8 @@
-import configparser
-import sys
-
 from utils import *
 import socket
 import argparse
 import json
-import signal
 import time
-import os,binascii
-from decimal import *
-from tempfile import mkstemp
-import shutil
 
 # bank server
 users = {}
@@ -122,9 +114,12 @@ def run_server(args):
     active_connection = False
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
     except socket.error as err:
         # print("socket creation failed with error %s" % err)
-        exit(255)
+        print("protocol_error")
+        exit(63)
 
     port = args.port
 
