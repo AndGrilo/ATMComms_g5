@@ -24,11 +24,11 @@ def new_account(data) -> Response:
         #return Response(False, 'account already exists')
         return Response(False, '255')
 
-    resp = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"]}
-    #    users = {
-    #        data["create"]["account"]: resp
-    #    }
-    users.update({data["create"]["account"]: resp})
+    info = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"],"balance":data["create"]["initial_balance"],"card_hash":data["create"]["card_hash"],"card_file":data["create"]["card_file"]}
+    resp = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"]}
+
+    users.update({data["create"]["account"]: info})
+    print("User_info:",users)
 
     return Response(True, json.dumps(resp))
 
@@ -36,6 +36,10 @@ def new_account(data) -> Response:
 def deposit(data) -> Response:
     if float(data["deposit"]["deposit"]) <= 0.00:
         #return Response(False, 'invalid amount to deposit')
+        return Response(False, '255')
+    user_card = open(data["deposit"]["card_file"], "r").read()
+    hash = user_card.split(":")
+    if hash[1] != users[data["deposit"]["account"]]["card_hash"] or data["deposit"]["card_file"] != users[data["deposit"]["account"]]["card_file"]:
         return Response(False, '255')
 
     if data["deposit"]["account"] in users:
@@ -51,7 +55,10 @@ def withdraw(data) -> Response:
     if float(data["withdraw"]["withdraw"]) <= 0.00:
         #return Response(False, 'invalid amount to withdraw')
         return Response(False, '255')
-
+    user_card = open(data["withdraw"]["card_file"], "r").read()
+    hash = user_card.split(":")
+    if hash[1] != users[data["withdraw"]["account"]]["card_hash"] or data["withdraw"]["card_file"] != users[data["withdraw"]["account"]]["card_file"]:
+        return Response(False, '255')
     if data["withdraw"]["account"] in users:
         if (users[data["withdraw"]["account"]]["balance"] - data["withdraw"]["withdraw"]) < 0.00:
             #return Response(False, 'not enough balance to withdraw that amount')
@@ -66,6 +73,10 @@ def withdraw(data) -> Response:
 
 
 def get_balance(data) -> Response:
+    user_card = open(data["get"]["card_file"], "r").read()
+    hash = user_card.split(":")
+    if hash[1] != users[data["get"]["account"]]["card_hash"] or data["get"]["card_file"] != users[data["get"]["account"]]["card_file"]:
+        return Response(False, '255')
     if data["get"]["account"] in users:
         resp = {"account": data["get"]["account"], "balance": users[data["get"]["account"]]["balance"]}
         return Response(True, json.dumps(resp))
@@ -134,6 +145,7 @@ def run_server(args):
                     print("client authenticated, challenge matches")
 
                     if "create" in json_resp:
+                        #print("card hash:",json_resp["create"]["card_hash"])
                         response = new_account(json_resp)
                         if response.success:
                             print(response.result)

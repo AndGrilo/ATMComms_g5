@@ -14,11 +14,11 @@ import shutil
 
 
 # client atm
-
+card = ""
 
 def create_card_file(args) -> Response:
     key = generate_random_string(16)
-    h = hmac.new(bytes(key, encoding='utf-8'), args.account.encode(), hashlib.sha256).hexdigest()
+    card = hmac.new(bytes(key, encoding='utf-8'), args.account.encode(), hashlib.sha256).hexdigest()
 
     if args.card_file:
         fname = args.card_file
@@ -26,12 +26,12 @@ def create_card_file(args) -> Response:
         fname = args.account + ".card"
     try:
         f = open(fname, "x")
-        f.write(args.account + ":" + h)
+        f.write(args.account + ":" + card)
         f.close
     except Exception:
         return Response(False, 'card file exists')
 
-    return Response(True, h)
+    return Response(True, card)
 
 
 def structure_command(args):
@@ -54,12 +54,13 @@ def structure_command(args):
                          "card_file": args.card_file, "withdraw": args.withdraw_amount}
         }
     if args.balance:
+        response = create_card_file(args)
         m = {
             "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                        "port": args.port,
-                       "card_file": args.card_file, "initial_balance": args.balance}
+                       "card_file": args.card_file, "initial_balance": args.balance,"card_hash":response.result}
         }
-        create_card_file(args)
+
 
     return m
 
