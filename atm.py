@@ -1,3 +1,5 @@
+import re
+
 from utils import *
 import socket
 import argparse
@@ -110,12 +112,7 @@ def run_atm(args):
 
                 s.sendall(bytes(challenge_response, encoding="utf-8"))
 
-                enc_data = s.recv(1024)
-                data = decrypt(key=content, data=enc_data.decode())
-                if not data.success:
-                    # print("decryption of result failed")
-                    exit(255)
-
+                data = s.recv(1024)
                 if data.decode() == '255' or len(data)<1:
                     exit(255)
                 if data.decode() == '63':
@@ -143,9 +140,36 @@ def validate_args(args) -> Response:
         args.auth_file = "bank.auth"
 
     if not args.card_file:
-
-
         args.card_file = args.account+".card"
+
+    n = 0
+    letter = 0
+    for i in sys.argv:
+        for l1 in i:
+            letter +=1
+        n +=1
+    if letter > 4096:
+        return Response(False, 'number of caracteres in parameters cannot be more than 4096.')
+
+    if len(args.account) > 122:
+        return Response(False, 'account name cannot exceed 122 caracters')
+
+    regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]).){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+
+    if not (re.search(regex, args.ip_address)):
+        return Response(False, 'IP not valid')
+
+    if type(args.balance) == 'Float':
+        if args.balance > 4294967295.99:
+            return Response(False, 'Account movement cannot be higher value than 4294967295.99')
+
+    if type(args.deposit_amount) == 'Float':
+        if args.deposit_amount > 4294967295.99:
+            return Response(False, 'Account movement cannot be higher value than 4294967295.99')
+
+    if type(args.withdraw_amount) == 'Float':
+        if args.withdraw_amount > 4294967295.99:
+            return Response(False, 'Account movement cannot be higher value than 4294967295.99')
 
     return Response(True, args)
 
