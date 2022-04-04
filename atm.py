@@ -39,10 +39,10 @@ def create_card_file(args) -> Response:
 
 def structure_command(args):
     current_time = int(time.time_ns())  # nanosecond precision
-    print("mensagem foi estruturada em " + str(current_time))
+    # print("mensagem foi estruturada em " + str(current_time))
 
     expire_date = current_time + MESSAGE_TTL
-    print(str(MESSAGE_TTL) + " segundos depois será " + str(expire_date))
+    # print(str(MESSAGE_TTL) + " segundos depois será " + str(expire_date))
 
     if args.get:
         m = {
@@ -95,7 +95,7 @@ def run_atm(args):
                 try:
                     content = open(args.auth_file, "r").read().rstrip()
                 except FileNotFoundError:
-                    print("auth file does not exist")
+                    # print("auth file does not exist")
                     exit(63)
 
                 # print("encrypting "+data+" with key "+content)
@@ -110,7 +110,7 @@ def run_atm(args):
                 try:
                     card_file_content = open(args.card_file, "r").read().rstrip()
                 except FileNotFoundError:
-                    print("card file does not exist")
+                    # print("card file does not exist")
                     exit(63)
 
                 challenge_response = encrypt(key=card_file_content, data=challenge)
@@ -123,7 +123,7 @@ def run_atm(args):
                 if data.decode() == '63':
                     exit(63)
 
-                print("received "+data.decode())
+                print(data.decode(), flush=True)
             except socket.timeout:
                 exit(63)
     except Exception as err:
@@ -185,8 +185,9 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    # if is_admin():
-    # proper_exit('Error: the script must run as unprivileged/regular user')
+    if is_admin():
+        #proper_exit('Error: the script must run as unprivileged/regular user')
+        exit(255)
 
     parser = create_parser()
 
@@ -212,5 +213,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as err:
-        print(err)
-        proper_exit('Program encountered an error during execution and cannot continue. Contact the support team')
+        # print(err)
+        exit(255)

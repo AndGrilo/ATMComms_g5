@@ -30,7 +30,7 @@ def new_account(data) -> Response:
     resp = {"account":data["create"]["account"],"initial_balance":data["create"]["initial_balance"]}
 
     users.update({data["create"]["account"]: info})
-    print("User_info:",users)
+    # print("User_info:", users)
 
     return Response(True, json.dumps(resp))
 
@@ -113,16 +113,18 @@ def get_card_file_name(data):
         user_name = data["get"]["account"]
 
     card_file_name = users[user_name]["card_file"]
-    print("fui buscar cardfilename " +card_file_name)
+    # print("fui buscar cardfilename " +card_file_name)
 
     return card_file_name
 
 
 def run_server(args):
+    active_connection = False
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     except socket.error as err:
-        print("socket creation failed with error %s" % err)
+        # print("socket creation failed with error %s" % err)
+        exit(255)
 
     port = args.port
 
@@ -134,16 +136,17 @@ def run_server(args):
             while True:
                 conn, addr = s.accept()
                 conn.settimeout(TIMEOUT)
-                #print("connected with client")
+                # print("connected with client")
+                active_connection = True
 
                 try:
                     encrypted_command_request = conn.recv(1024)
-                    #print(encrypted_command_request.decode())
+                    # print(encrypted_command_request.decode())
 
                     try:
                         content = open(args.filename, "r").read()
                     except FileNotFoundError:
-                        print("bank authentication file does not exist")
+                        # print("bank authentication file does not exist")
                         conn.close()
                         continue
 
@@ -154,7 +157,7 @@ def run_server(args):
                     denc_json = decrypt(key=content, data=encrypted_command_request.decode())
 
                     if not denc_json.success:
-                        print("decryption of command failed")
+                        # print("decryption of command failed")
                         conn.send(bytes("255", encoding='utf-8'))
                         conn.close()
                         continue
@@ -170,12 +173,12 @@ def run_server(args):
                     # print("received chal response "+challenge_response.decode())
 
                     card_file_name = get_card_file_name(json_resp)
-                    print("a card file chama-se " + card_file_name)
+                    # print("a card file chama-se " + card_file_name)
 
                     try:
                         card_file_content = open(card_file_name, "r").read()
                     except FileNotFoundError:
-                        print("card file does not exist")
+                        # print("card file does not exist")
                         conn.close()
                         continue
 
@@ -183,25 +186,25 @@ def run_server(args):
                     # print("chal response solution "+challenge_response_solution.decode())
 
                     if not challenge_response_solution.success:
-                        print("decryption of challenge response failed")
+                        # print("decryption of challenge response failed")
                         conn.send(bytes("255", encoding='utf-8'))
                         conn.close()
                         continue
 
                     current_time = int(time.time_ns())  # nanosecond precision
-                    print("Current time on server is " + str(current_time))
+                   # print("Current time on server is " + str(current_time))
 
                     expire_date = get_expire_date(json_resp)
-                    print("expire date on msg is " + str(expire_date))
+                   # print("expire date on msg is " + str(expire_date))
 
                     if challenge_response_solution.result.decode() == challenge and expire_date > current_time:
-                        print("challenge matches and " + str(expire_date) + ">" + str(current_time))
+                       # print("challenge matches and " + str(expire_date) + ">" + str(current_time))
 
                         if "create" in json_resp:
                             # print("card hash:",json_resp["create"]["card_hash"])
                             response = new_account(json_resp)
                             if response.success:
-                                print(response.result)
+                                print(response.result, flush=True)
                                 conn.send(bytes(response.result, encoding='utf-8'))
                             else:
                                 conn.send(bytes(response.result, encoding='utf-8'))
@@ -212,7 +215,7 @@ def run_server(args):
                         if "deposit" in json_resp:
                             response = deposit(json_resp)
                             if response.success:
-                                print(response.result)
+                                print(response.result, flush=True)
                                 conn.send(bytes(response.result, encoding='utf-8'))
                             else:
                                 conn.send(bytes(response.result, encoding='utf-8'))
@@ -223,7 +226,7 @@ def run_server(args):
                         if "withdraw" in json_resp:
                             response = withdraw(json_resp)
                             if response.success:
-                                print(response.result)
+                                print(response.result, flush=True)
                                 conn.send(bytes(response.result, encoding='utf-8'))
                             else:
                                 conn.send(bytes(response.result, encoding='utf-8'))
@@ -234,7 +237,7 @@ def run_server(args):
                         if 'get' in json_resp:
                             response = get_balance(json_resp)
                             if response.success:
-                                print(response.result)
+                                print(response.result, flush=True)
                                 conn.send(bytes(response.result, encoding='utf-8'))
                             else:
                                 conn.send(bytes(response.result, encoding='utf-8'))
@@ -245,9 +248,9 @@ def run_server(args):
                         conn.send(bytes("255", encoding='utf-8'))
                         conn.close()
                         #s.close()
-                        print("client NOT authenticated, challenge differ or TTL expired")
+                        #print("client NOT authenticated, challenge differ or TTL expired")
                 except socket.timeout:
-                    print("protocol_error")
+                    print("protocol_error", flush=True)
                     conn.close()
                     continue
 
@@ -255,25 +258,25 @@ def run_server(args):
                 continue
         except KeyboardInterrupt:
             s.close()
-            conn.close()
-            proper_exit('SIGTERM', 255)
-    except Exception as err:
-        print(err)
+            if active_connection:
+                conn.close()
+            exit(0)
+    except Exception:
         s.close()
-        proper_exit("protocol error", 63)
+        if active_connection:
+            conn.close()
+        exit(255)
 
 
 def create_auth_file(filename: str):
     try:
         f = open(filename, "x")
-        #f.write("xxxxyyyyxxxxyyyy")
         content = generate_random_string(16)
         f.write(content)
-        #print("wrote "+content)
         f.close()
-        print("created")
+        print("created", flush=True)
     except Exception:
-        proper_exit('File exists')
+        exit(255)
 
 
 def validate_args(args) -> Response:
@@ -305,8 +308,9 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    # if is_admin():
-    # proper_exit('Error: the script must run as unprivileged/regular user')
+    if is_admin():
+        # proper_exit('Error: the script must run as unprivileged/regular user')
+        exit(255)
 
     parser = create_parser()
 
@@ -325,13 +329,11 @@ def main() -> None:
         parser.error(str(er))
 
 
-def __init__(self):
-    signal.signal(signal.SIGTERM, proper_exit('SIGTERM', 255))
-
-
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        exit(0)
     except Exception as err:
         print(err)
-        proper_exit('Program encountered an error during execution and cannot continue')
+        exit(255)
