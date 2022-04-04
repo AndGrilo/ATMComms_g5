@@ -197,9 +197,11 @@ def main() -> None:
             args = response.result
             run_atm(args)
         else:
-            proper_exit('', 255)
+            exit(255)
     except argparse.ArgumentError as er:
-        parser.error(str(er))
+        # parser.error(str(er))
+        parser.print_usage()
+        exit(255)
 
 
 if __name__ == '__main__':
