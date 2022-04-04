@@ -14,6 +14,7 @@ import shutil
 
 # bank server
 users = {}
+TIMEOUT = 10
 
 
 def new_account(data) -> Response:
@@ -99,14 +100,21 @@ def get_expire_date(data):
 
 
 def get_card_file_name(data):
+
     if "create" in data:
         card_file_name = data["create"]["card_file"]
+        return card_file_name
+
     elif "withdraw" in data:
-        card_file_name = data["withdraw"]["card_file"]
+        user_name = data["withdraw"]["account"]
     elif "deposit" in data:
-        card_file_name = data["deposit"]["card_file"]
+        user_name = data["deposit"]["account"]
     elif "get" in data:
-        card_file_name = data["get"]["card_file"]
+        user_name = data["get"]["account"]
+
+    card_file_name = users[user_name]["card_file"]
+    print("fui buscar cardfilename " +card_file_name)
+
     return card_file_name
 
 
@@ -125,117 +133,123 @@ def run_server(args):
         try:
             while True:
                 conn, addr = s.accept()
+                conn.settimeout(TIMEOUT)
                 #print("connected with client")
 
-                encrypted_command_request = conn.recv(1024)
-                #print(encrypted_command_request.decode())
-
                 try:
-                    content = open(args.filename, "r").read()
-                except FileNotFoundError:
-                    print("bank authentication file does not exist")
-                    conn.close()
-                    continue
+                    encrypted_command_request = conn.recv(1024)
+                    #print(encrypted_command_request.decode())
 
-                if len(encrypted_command_request.decode('utf-8')) <= 0:
-                    conn.close()
-                    continue
-
-                denc_json = decrypt(key=content, data=encrypted_command_request.decode())
-
-                if not denc_json.success:
-                    print("decryption of command failed")
-                    conn.send(bytes("255", encoding='utf-8'))
-                    conn.close()
-                    continue
-
-                json_resp = json.loads(denc_json.result.decode('utf-8'))  # convert str to json
-                # print(json_resp)
-
-                challenge = generate_random_string(16)
-                conn.send(bytes(challenge, encoding='utf-8'))
-                # print("sent challenge "+challenge)
-
-                challenge_response = conn.recv(1024)
-                # print("received chal response "+challenge_response.decode())
-
-                card_file_name = get_card_file_name(json_resp)
-                print("a card file chama-se " + card_file_name)
-
-                try:
-                    card_file_content = open(card_file_name, "r").read()
-                except FileNotFoundError:
-                    print("card file does not exist")
-                    conn.close()
-                    continue
-
-                challenge_response_solution = decrypt(key=card_file_content, data=challenge_response.decode())
-                # print("chal response solution "+challenge_response_solution.decode())
-
-                if not challenge_response_solution.success:
-                    print("decryption of challenge response failed")
-                    conn.send(bytes("255", encoding='utf-8'))
-                    conn.close()
-                    continue
-
-                current_time = int(time.time())  # whole seconds precision
-                # print("Current time on server is " + str(current_time))
-
-                expire_date = get_expire_date(json_resp)
-                # print("expire date on msg is " + str(expire_date))
-
-                if challenge_response_solution.result.decode() == challenge and expire_date > current_time:
-                    print("challenge matches and " + str(expire_date) + ">" + str(current_time))
-
-                    if "create" in json_resp:
-                        # print("card hash:",json_resp["create"]["card_hash"])
-                        response = new_account(json_resp)
-                        if response.success:
-                            print(response.result)
-                            conn.send(bytes(response.result, encoding='utf-8'))
-                        else:
-                            conn.send(bytes(response.result, encoding='utf-8'))
-
+                    try:
+                        content = open(args.filename, "r").read()
+                    except FileNotFoundError:
+                        print("bank authentication file does not exist")
                         conn.close()
                         continue
 
-                    if "deposit" in json_resp:
-                        response = deposit(json_resp)
-                        if response.success:
-                            print(response.result)
-                            conn.send(bytes(response.result, encoding='utf-8'))
-                        else:
-                            conn.send(bytes(response.result, encoding='utf-8'))
-
+                    if len(encrypted_command_request.decode('utf-8')) <= 0:
                         conn.close()
                         continue
 
-                    if "withdraw" in json_resp:
-                        response = withdraw(json_resp)
-                        if response.success:
-                            print(response.result)
-                            conn.send(bytes(response.result, encoding='utf-8'))
-                        else:
-                            conn.send(bytes(response.result, encoding='utf-8'))
+                    denc_json = decrypt(key=content, data=encrypted_command_request.decode())
 
+                    if not denc_json.success:
+                        print("decryption of command failed")
+                        conn.send(bytes("255", encoding='utf-8'))
                         conn.close()
                         continue
 
-                    if 'get' in json_resp:
-                        response = get_balance(json_resp)
-                        if response.success:
-                            print(response.result)
-                            conn.send(bytes(response.result, encoding='utf-8'))
-                        else:
-                            conn.send(bytes(response.result, encoding='utf-8'))
+                    json_resp = json.loads(denc_json.result.decode('utf-8'))  # convert str to json
+                    # print(json_resp)
 
+                    challenge = generate_random_string(16)
+                    conn.send(bytes(challenge, encoding='utf-8'))
+                    # print("sent challenge "+challenge)
+
+                    challenge_response = conn.recv(1024)
+                    # print("received chal response "+challenge_response.decode())
+
+                    card_file_name = get_card_file_name(json_resp)
+                    print("a card file chama-se " + card_file_name)
+
+                    try:
+                        card_file_content = open(card_file_name, "r").read()
+                    except FileNotFoundError:
+                        print("card file does not exist")
                         conn.close()
                         continue
-                else:
-                    conn.send(bytes("255", encoding='utf-8'))
+
+                    challenge_response_solution = decrypt(key=card_file_content, data=challenge_response.decode())
+                    # print("chal response solution "+challenge_response_solution.decode())
+
+                    if not challenge_response_solution.success:
+                        print("decryption of challenge response failed")
+                        conn.send(bytes("255", encoding='utf-8'))
+                        conn.close()
+                        continue
+
+                    current_time = int(time.time_ns())  # nanosecond precision
+                    print("Current time on server is " + str(current_time))
+
+                    expire_date = get_expire_date(json_resp)
+                    print("expire date on msg is " + str(expire_date))
+
+                    if challenge_response_solution.result.decode() == challenge and expire_date > current_time:
+                        print("challenge matches and " + str(expire_date) + ">" + str(current_time))
+
+                        if "create" in json_resp:
+                            # print("card hash:",json_resp["create"]["card_hash"])
+                            response = new_account(json_resp)
+                            if response.success:
+                                print(response.result)
+                                conn.send(bytes(response.result, encoding='utf-8'))
+                            else:
+                                conn.send(bytes(response.result, encoding='utf-8'))
+
+                            conn.close()
+                            continue
+
+                        if "deposit" in json_resp:
+                            response = deposit(json_resp)
+                            if response.success:
+                                print(response.result)
+                                conn.send(bytes(response.result, encoding='utf-8'))
+                            else:
+                                conn.send(bytes(response.result, encoding='utf-8'))
+
+                            conn.close()
+                            continue
+
+                        if "withdraw" in json_resp:
+                            response = withdraw(json_resp)
+                            if response.success:
+                                print(response.result)
+                                conn.send(bytes(response.result, encoding='utf-8'))
+                            else:
+                                conn.send(bytes(response.result, encoding='utf-8'))
+
+                            conn.close()
+                            continue
+
+                        if 'get' in json_resp:
+                            response = get_balance(json_resp)
+                            if response.success:
+                                print(response.result)
+                                conn.send(bytes(response.result, encoding='utf-8'))
+                            else:
+                                conn.send(bytes(response.result, encoding='utf-8'))
+
+                            conn.close()
+                            continue
+                    else:
+                        conn.send(bytes("255", encoding='utf-8'))
+                        conn.close()
+                        #s.close()
+                        print("client NOT authenticated, challenge differ or TTL expired")
+                except socket.timeout:
+                    print("protocol_error")
                     conn.close()
-                    #s.close()
-                    print("client NOT authenticated, challenge differ")
+                    continue
 
                 conn.close()
                 continue

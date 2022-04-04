@@ -15,7 +15,7 @@ import shutil
 
 
 # client atm
-MESSAGE_TTL = 2  # in seconds
+MESSAGE_TTL = 1000000000  # in nanoseconds
 card = ""
 
 
@@ -38,11 +38,11 @@ def create_card_file(args) -> Response:
 
 
 def structure_command(args):
-    current_time = int(time.time())  # whole seconds precision
-    # print("mensagem foi estruturada em " + str(current_time))
+    current_time = int(time.time_ns())  # nanosecond precision
+    print("mensagem foi estruturada em " + str(current_time))
 
     expire_date = current_time + MESSAGE_TTL
-    # print(str(MESSAGE_TTL) + " segundos depois será " + str(expire_date))
+    print(str(MESSAGE_TTL) + " segundos depois será " + str(expire_date))
 
     if args.get:
         m = {
@@ -64,6 +64,10 @@ def structure_command(args):
         }
     if args.balance:
         response = create_card_file(args)
+
+        if not response.success:
+            exit(255)
+
         m = {
             "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                        "port": args.port, "card_file": args.card_file, "initial_balance": args.balance,
@@ -85,41 +89,43 @@ def run_atm(args):
             s.connect((host, port))
             # print("connected with server")
 
-            data = json.dumps(m)
-
             try:
-                content = open(args.auth_file, "r").read().rstrip()
-            except FileNotFoundError:
-                print("auth file does not exist")
+                data = json.dumps(m)
+
+                try:
+                    content = open(args.auth_file, "r").read().rstrip()
+                except FileNotFoundError:
+                    print("auth file does not exist")
+                    exit(63)
+
+                # print("encrypting "+data+" with key "+content)
+                encrypted_data = encrypt(key=content, data=bytes(data, encoding='utf-8'))
+
+                # print(encrypted_data)
+                s.sendall(bytes(encrypted_data, encoding="utf-8"))
+
+                challenge = s.recv(1024)
+                # print(challenge.decode())
+
+                try:
+                    card_file_content = open(args.card_file, "r").read().rstrip()
+                except FileNotFoundError:
+                    print("card file does not exist")
+                    exit(63)
+
+                challenge_response = encrypt(key=card_file_content, data=challenge)
+
+                s.sendall(bytes(challenge_response, encoding="utf-8"))
+
+                data = s.recv(1024)
+                if data.decode() == '255' or len(data)<1:
+                    exit(255)
+                if data.decode() == '63':
+                    exit(63)
+
+                print("received "+data.decode())
+            except socket.timeout:
                 exit(63)
-
-            # print("encrypting "+data+" with key "+content)
-            encrypted_data = encrypt(key=content, data=bytes(data, encoding='utf-8'))
-
-            # print(encrypted_data)
-            s.sendall(bytes(encrypted_data, encoding="utf-8"))
-
-            challenge = s.recv(1024)
-            # print(challenge.decode())
-
-            try:
-                card_file_content = open(args.card_file, "r").read().rstrip()
-            except FileNotFoundError:
-                print("card file does not exist")
-                exit(63)
-
-            challenge_response = encrypt(key=card_file_content, data=challenge)
-
-            s.sendall(bytes(challenge_response, encoding="utf-8"))
-
-            data = s.recv(1024)
-            if data.decode() == '255' or len(data)<1:
-                exit(255)
-            if data.decode() == '63':
-                exit(63)
-
-            print("received "+data.decode())
-
     except Exception as err:
         # print(err)
         exit(63)
