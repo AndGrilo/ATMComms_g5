@@ -130,41 +130,65 @@ def run_server(args):
                 encrypted_command_request = conn.recv(1024)
                 #print(encrypted_command_request.decode())
 
-                content = open(args.filename, "r").read()
+                try:
+                    content = open(args.filename, "r").read()
+                except FileNotFoundError:
+                    print("bank authentication file does not exist")
+                    conn.close()
+                    continue
 
                 if len(encrypted_command_request.decode('utf-8')) <= 0:
                     conn.close()
                     continue
 
                 denc_json = decrypt(key=content, data=encrypted_command_request.decode())
-                json_resp = json.loads(denc_json.decode('utf-8'))  # convert str to json
-                #print(json_resp)
+
+                if not denc_json.success:
+                    print("decryption of command failed")
+                    conn.send(bytes("255", encoding='utf-8'))
+                    conn.close()
+                    continue
+
+                json_resp = json.loads(denc_json.result.decode('utf-8'))  # convert str to json
+                # print(json_resp)
 
                 challenge = generate_random_string(16)
                 conn.send(bytes(challenge, encoding='utf-8'))
-                #print("sent challenge "+challenge)
+                # print("sent challenge "+challenge)
 
                 challenge_response = conn.recv(1024)
-                #print("received chal response "+challenge_response.decode())
+                # print("received chal response "+challenge_response.decode())
 
                 card_file_name = get_card_file_name(json_resp)
                 print("a card file chama-se " + card_file_name)
-                card_file_content = open(card_file_name, "r").read()
+
+                try:
+                    card_file_content = open(card_file_name, "r").read()
+                except FileNotFoundError:
+                    print("card file does not exist")
+                    conn.close()
+                    continue
 
                 challenge_response_solution = decrypt(key=card_file_content, data=challenge_response.decode())
-                #print("chal response solution "+challenge_response_solution.decode())
+                # print("chal response solution "+challenge_response_solution.decode())
+
+                if not challenge_response_solution.success:
+                    print("decryption of challenge response failed")
+                    conn.send(bytes("255", encoding='utf-8'))
+                    conn.close()
+                    continue
 
                 current_time = int(time.time())  # whole seconds precision
-                print("Current time on server is " + str(current_time))
+                # print("Current time on server is " + str(current_time))
 
                 expire_date = get_expire_date(json_resp)
-                print("expire date on msg is " + str(expire_date))
+                # print("expire date on msg is " + str(expire_date))
 
-                if challenge_response_solution.decode() == challenge and expire_date > current_time:
+                if challenge_response_solution.result.decode() == challenge and expire_date > current_time:
                     print("challenge matches and " + str(expire_date) + ">" + str(current_time))
 
                     if "create" in json_resp:
-                        #print("card hash:",json_resp["create"]["card_hash"])
+                        # print("card hash:",json_resp["create"]["card_hash"])
                         response = new_account(json_resp)
                         if response.success:
                             print(response.result)
@@ -244,13 +268,13 @@ def validate_args(args) -> Response:
     return Response(True, args)
 
 
-def check_double_params(listOfElems):
-    setOfElems = set()
-    for elem in listOfElems:
-        if elem in setOfElems:
+def check_double_params(list_of_elements):
+    set_of_elements = set()
+    for elem in list_of_elements:
+        if elem in set_of_elements:
             return True
         else:
-            setOfElems.add(elem)
+            set_of_elements.add(elem)
     return False
 
 

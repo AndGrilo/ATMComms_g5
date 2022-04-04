@@ -32,7 +32,7 @@ def encrypt(key: str, data, encode: bool = True):
         print(err)
 
 
-def decrypt(key: str, data, decode: bool = True):
+def decrypt(key: str, data, decode: bool = True) -> Response:
 
     key = SHA256.new(key.encode('utf-8')).digest()
     data = base64.b64decode(data.encode('utf-8')) if decode else data
@@ -41,8 +41,10 @@ def decrypt(key: str, data, decode: bool = True):
     data = decryptor.decrypt(data[AES.block_size:])
     padding = data[-1]
     if data[-padding:] != bytes([padding]) * padding:
-        raise ValueError("Invalid padding...")
-    return data[:-padding]
+        # raise ValueError("Invalid padding...")
+        return Response(False, 'invalid padding')
+
+    return Response(True, data[:-padding])
 
 
 def generate_random_string(str_size: int):
