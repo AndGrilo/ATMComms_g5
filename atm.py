@@ -7,6 +7,7 @@ import argparse
 import json
 import hmac
 import hashlib
+import time
 import string
 import random
 from tempfile import mkstemp
@@ -14,7 +15,9 @@ import shutil
 
 
 # client atm
+MESSAGE_TTL = 2  # in seconds
 card = ""
+
 
 def create_card_file(args) -> Response:
     key = generate_random_string(16)
@@ -35,30 +38,36 @@ def create_card_file(args) -> Response:
 
 
 def structure_command(args):
+    current_time = int(time.time())  # whole seconds precision
+    print("mensagem foi estruturada em " + str(current_time))
+
+    expire_date = current_time + MESSAGE_TTL
+    print(str(MESSAGE_TTL) + " segundos depois será " + str(expire_date))
+
     if args.get:
         m = {
             "get": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                     "port": args.port,
-                    "card_file": args.card_file, "get": args.get}
+                    "card_file": args.card_file, "get": args.get, "expire_date": expire_date}
         }
     if args.deposit_amount:
         m = {
             "deposit": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                         "port": args.port,
-                        "card_file": args.card_file, "deposit": args.deposit_amount}
+                        "card_file": args.card_file, "deposit": args.deposit_amount, "expire_date": expire_date}
         }
     if args.withdraw_amount:
         m = {
             "withdraw": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
                          "port": args.port,
-                         "card_file": args.card_file, "withdraw": args.withdraw_amount}
+                         "card_file": args.card_file, "withdraw": args.withdraw_amount, "expire_date": expire_date}
         }
     if args.balance:
         response = create_card_file(args)
         m = {
             "create": {"account": args.account, "auth_file": args.auth_file, "ip_address": args.ip_address,
-                       "port": args.port,
-                       "card_file": args.card_file, "initial_balance": args.balance,"card_hash":response.result}
+                       "port": args.port, "card_file": args.card_file, "initial_balance": args.balance,
+                       "card_hash": response.result, "expire_date": expire_date}
         }
 
 
@@ -75,20 +84,19 @@ def run_atm(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((host, port))
-            print("connected with server")
+            #print("connected with server")
 
             data = json.dumps(m)
-            print(type(data))
 
             content = open(args.auth_file, "r").read().rstrip()
-            print("encrypting "+data+" with key "+content)
+            #print("encrypting "+data+" with key "+content)
             encrypted_data = encrypt(key=content, data=bytes(data, encoding='utf-8'))
 
-            print(encrypted_data)
+            #print(encrypted_data)
             s.sendall(bytes(encrypted_data, encoding="utf-8"))
 
             challenge = s.recv(1024)
-            print(challenge.decode())
+            #print(challenge.decode())
 
             card_file_content = open(args.card_file, "r").read().rstrip()
             challenge_response = encrypt(key=card_file_content, data=challenge)
@@ -125,13 +133,13 @@ def validate_args(args) -> Response:
     return Response(True, args)
 
 
-def check_double_params(listOfElems):
-    setOfElems = set()
-    for elem in listOfElems:
-        if elem in setOfElems:
+def check_double_params(list_of_elements):
+    set_of_elements = set()
+    for elem in list_of_elements:
+        if elem in set_of_elements:
             return True
         else:
-            setOfElems.add(elem)
+            set_of_elements.add(elem)
     return False
 
 

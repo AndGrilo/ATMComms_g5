@@ -6,6 +6,7 @@ import socket
 import argparse
 import json
 import signal
+import time
 import os,binascii
 from decimal import *
 from tempfile import mkstemp
@@ -85,6 +86,18 @@ def get_balance(data) -> Response:
         return Response(False, '255')
 
 
+def get_expire_date(data):
+    if "create" in data:
+        expire_date = data["create"]["expire_date"]
+    elif "withdraw" in data:
+        expire_date = data["withdraw"]["expire_date"]
+    elif "deposit" in data:
+        expire_date = data["deposit"]["expire_date"]
+    elif "get" in data:
+        expire_date = data["get"]["expire_date"]
+    return expire_date
+
+
 def get_card_file_name(data):
     if "create" in data:
         card_file_name = data["create"]["card_file"]
@@ -112,10 +125,10 @@ def run_server(args):
         try:
             while True:
                 conn, addr = s.accept()
-                print("connected with client")
+                #print("connected with client")
 
                 encrypted_command_request = conn.recv(1024)
-                print(encrypted_command_request.decode())
+                #print(encrypted_command_request.decode())
 
                 content = open(args.filename, "r").read()
 
@@ -125,24 +138,30 @@ def run_server(args):
 
                 denc_json = decrypt(key=content, data=encrypted_command_request.decode())
                 json_resp = json.loads(denc_json.decode('utf-8'))  # convert str to json
-                print(json_resp)
+                #print(json_resp)
 
                 challenge = generate_random_string(16)
                 conn.send(bytes(challenge, encoding='utf-8'))
-                print("sent challenge "+challenge)
+                #print("sent challenge "+challenge)
 
                 challenge_response = conn.recv(1024)
-                print("received chal response "+challenge_response.decode())
+                #print("received chal response "+challenge_response.decode())
 
                 card_file_name = get_card_file_name(json_resp)
                 print("a card file chama-se " + card_file_name)
                 card_file_content = open(card_file_name, "r").read()
 
                 challenge_response_solution = decrypt(key=card_file_content, data=challenge_response.decode())
-                print("chal response solution "+challenge_response_solution.decode())
+                #print("chal response solution "+challenge_response_solution.decode())
 
-                if challenge_response_solution.decode() == challenge:
-                    print("client authenticated, challenge matches")
+                current_time = int(time.time())  # whole seconds precision
+                print("Current time on server is " + str(current_time))
+
+                expire_date = get_expire_date(json_resp)
+                print("expire date on msg is " + str(expire_date))
+
+                if challenge_response_solution.decode() == challenge and expire_date > current_time:
+                    print("challenge matches and " + str(expire_date) + ">" + str(current_time))
 
                     if "create" in json_resp:
                         #print("card hash:",json_resp["create"]["card_hash"])
@@ -194,7 +213,6 @@ def run_server(args):
                     #s.close()
                     print("client NOT authenticated, challenge differ")
 
-
                 conn.close()
                 continue
         except KeyboardInterrupt:
@@ -213,7 +231,7 @@ def create_auth_file(filename: str):
         #f.write("xxxxyyyyxxxxyyyy")
         content = generate_random_string(16)
         f.write(content)
-        print("wrote "+content)
+        #print("wrote "+content)
         f.close()
         print("created")
     except Exception:
