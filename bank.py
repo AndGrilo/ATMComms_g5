@@ -195,14 +195,16 @@ def run_server(args):
                     if challenge_response_solution.result.decode() == challenge and expire_date > current_time:
                        # print("challenge matches and " + str(expire_date) + ">" + str(current_time))
 
+                        #message_to_send = ''
+
                         if "create" in json_resp:
                             # print("card hash:",json_resp["create"]["card_hash"])
                             response = new_account(json_resp)
                             if response.success:
                                 print(response.result, flush=True)
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
                             else:
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
 
                             conn.close()
                             continue
@@ -211,9 +213,9 @@ def run_server(args):
                             response = deposit(json_resp)
                             if response.success:
                                 print(response.result, flush=True)
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
                             else:
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
 
                             conn.close()
                             continue
@@ -222,9 +224,9 @@ def run_server(args):
                             response = withdraw(json_resp)
                             if response.success:
                                 print(response.result, flush=True)
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
                             else:
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
 
                             conn.close()
                             continue
@@ -233,12 +235,15 @@ def run_server(args):
                             response = get_balance(json_resp)
                             if response.success:
                                 print(response.result, flush=True)
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
                             else:
-                                conn.send(bytes(response.result, encoding='utf-8'))
+                                message_to_send = response.result
 
                             conn.close()
                             continue
+
+                        enc_message_to_send = encrypt(key=args.filename, data=message_to_send)
+                        conn.send(bytes(enc_message_to_send, encoding='utf-8'))
                     else:
                         conn.send(bytes("255", encoding='utf-8'))
                         conn.close()
@@ -266,7 +271,7 @@ def run_server(args):
 def create_auth_file(filename: str):
     try:
         f = open(filename, "x")
-        content = generate_random_string(16)
+        content = generate_random_string(128)
         f.write(content)
         f.close()
         print("created", flush=True)
@@ -319,7 +324,7 @@ def main() -> None:
             create_auth_file(args.filename)
             run_server(args)
         else:
-            proper_exit(response.result)
+            exit(255)
     except argparse.ArgumentError as er:
         parser.error(str(er))
 

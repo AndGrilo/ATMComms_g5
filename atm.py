@@ -110,7 +110,12 @@ def run_atm(args):
 
                 s.sendall(bytes(challenge_response, encoding="utf-8"))
 
-                data = s.recv(1024)
+                enc_data = s.recv(1024)
+                data = decrypt(key=content, data=enc_data.decode())
+                if not data.success:
+                    # print("decryption of result failed")
+                    exit(255)
+
                 if data.decode() == '255' or len(data)<1:
                     exit(255)
                 if data.decode() == '63':
@@ -138,6 +143,8 @@ def validate_args(args) -> Response:
         args.auth_file = "bank.auth"
 
     if not args.card_file:
+
+
         args.card_file = args.account+".card"
 
     return Response(True, args)
