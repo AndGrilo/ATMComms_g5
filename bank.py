@@ -94,12 +94,16 @@ def get_expire_date(data):
 def get_card_file_name(data):
     if "create" in data:
         card_file_name = data["create"]["card_file"]
+        return card_file_name
+
     elif "withdraw" in data:
-        card_file_name = data["withdraw"]["card_file"]
+        user_name = data["withdraw"]["account"]
     elif "deposit" in data:
-        card_file_name = data["deposit"]["card_file"]
+        user_name = data["deposit"]["account"]
     elif "get" in data:
-        card_file_name = data["get"]["card_file"]
+        user_name = data["get"]["account"]
+
+    card_file_name = users[user_name]["card_file"]
     return card_file_name
 
 
@@ -124,12 +128,12 @@ def run_server(args):
             while True:
                 conn, addr = s.accept()
                 conn.settimeout(TIMEOUT)
-                # print("connected with client")
+                print("connected with client")
                 active_connection = True
 
                 try:
                     encrypted_command_request = conn.recv(1024)
-                    # print(encrypted_command_request.decode())
+                    print(encrypted_command_request.decode())
 
                     try:
                         content = open(args.filename, "r").read()
